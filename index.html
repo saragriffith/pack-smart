@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Pack Smart">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Pack Smart</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'DM Sans', sans-serif; background: linear-gradient(170deg, #f5f0ea 0%, #ebe4da 40%, #e8dfd3 100%); color: #3d3a35; min-height: 100vh; min-height: 100dvh; }
+  input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
+</style>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const STORAGE_KEY = "packsmart-trips";
+
+function loadTrips() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+function saveTripsToStorage(trips) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
+}
+
+const MASTER_ITEMS = {
+  toiletries: {
+    label: "Toiletries", alwaysShow: true,
+    items: [
+      { id: "shampoo", name: "Shampoo" },
+      { id: "conditioner", name: "Conditioner" },
+      { id: "bodywash", name: "Body wash" },
+      { id: "deodorant", name: "Deodorant" },
+      { id: "toothbrush", name: "Toothbrush + toothpaste" },
+      { id: "lotion", name: "Lotion/moisturizer" },
+      { id: "tampons", name: "Tampons", conditional: "if applicable" },
+      { id: "hairties", name: "Hair ties" },
+      { id: "qtips", name: "Q-tips" },
+    ],
+  },
+  hair: {
+    label: "Hair", alwaysShow: true,
+    items: [
+      { id: "serum", name: "Serum" },
+      { id: "leavein", name: "Leave-in conditioner" },
+      { id: "beautifier", name: "Beautifier" },
+      { id: "curlcream", name: "Curl cream" },
+      { id: "hairspray", name: "Hair spray" },
+      { id: "frizzcream", name: "Frizz cream" },
+      { id: "comb", name: "Comb" },
+      { id: "flatiron", name: "Flat iron" },
+      { id: "dyson", name: "Dyson Airwrap + attachments" },
+    ],
+  },
+  clothes: {
+    label: "Clothes", alwaysShow: true,
+    items: [
+      { id: "tshirts", name: "T-shirts", hasCount: true },
+      { id: "leggings", name: "Leggings", hasCount: true },
+      { id: "jeans", name: "Jeans (1 pair)" },
+      { id: "shorts", name: "Shorts", minHigh: 70 },
+      { id: "hoodies", name: "Hoodies", hasCount: true },
+      { id: "niceroutfit", name: "Nicer outfit (sweater/vest)", showWhen: ["exploring"] },
+      { id: "joggers", name: "Joggers/sweats (PJs — 1 pair)" },
+      { id: "pjtshirt", name: "PJ t-shirt (1)" },
+      { id: "swimsuit", name: "Swimsuit", showWhen: ["beach"], minHigh: 80 },
+      { id: "bras", name: "Bras", hasCount: true },
+      { id: "sportsbras", name: "Sports bras (2)", showWhen: ["workout"] },
+      { id: "underwear", name: "Underwear", hasCount: true },
+      { id: "socks", name: "Socks", hasCount: true },
+    ],
+  },
+  workout: {
+    label: "Workout", showWhen: ["workout"],
+    items: [
+      { id: "workoutpants", name: "Puma athletic pants" },
+      { id: "workouttop", name: "Workout top" },
+    ],
+  },
+  shoes: {
+    label: "Shoes", alwaysShow: true,
+    items: [
+      { id: "allbirds", name: "Allbirds slip-ons" },
+      { id: "pumas", name: "Puma tennis shoes" },
+      { id: "birks", name: "Birkenstock sandals", minHigh: 70 },
+      { id: "slippers", name: "IKEA slippers" },
+    ],
+  },
+  outerwear: {
+    label: "Outerwear", alwaysShow: true,
+    items: [
+      { id: "patfleece", name: "Gray Patagonia fleece", maxHigh: 79 },
+      { id: "nanopuff", name: "Turquoise Patagonia Nano Puff", maxHigh: 59, orLowBelow: 50 },
+      { id: "overcoat", name: "Black winter overcoat (knee-length)", maxHigh: 49, orLowBelow: 40 },
+      { id: "windbreaker", name: "Blue Columbia windbreaker", maxHigh: 79 },
+    ],
+  },
+  tech: {
+    label: "Tech", showWhen: ["working"],
+    items: [
+      { id: "bookbag", name: "Work bookbag", isBag: true, contents: [
+        { id: "travelmonitor", name: "Travel monitor" },
+        { id: "applewatch", name: "Apple Watch + charger" },
+        { id: "airpods", name: "AirPods + case" },
+        { id: "btspeaker", name: "Bluetooth speaker" },
+        { id: "firestick", name: "Firestick + remote" },
+        { id: "personalmac", name: "Personal MacBook + charger" },
+      ]},
+      { id: "workbin", name: "Work bin", isBag: true, contents: [
+        { id: "worklaptop", name: "Work laptop + charger" },
+        { id: "phonecharger", name: "Phone charger" },
+        { id: "mouse", name: "Mouse" },
+        { id: "keyboard", name: "Keyboard" },
+        { id: "headphones", name: "Headphones" },
+        { id: "notebooks", name: "Notebooks" },
+        { id: "pens_tech", name: "Pens" },
+      ]},
+      { id: "foldingtable", name: "Folding table", conditional: "if needed" },
+      { id: "extramonitor", name: "Extra monitor", conditional: "if needed" },
+    ],
+  },
+  meds: {
+    label: "Meds / Health / Sensory", alwaysShow: true,
+    items: [
+      { id: "pillbottle", name: "Pre-packed pill bottle (daily meds, vitamins, Advil, Tylenol, Benadryl)" },
+      { id: "allergymeds", name: "Allergy meds" },
+      { id: "earplugs", name: "Earplugs" },
+      { id: "ncheadphones", name: "Noise-canceling headphones" },
+      { id: "pillow", name: "Own pillow" },
+      { id: "blanket", name: "Own blanket" },
+    ],
+  },
+  food: {
+    label: "Food", showWhen: ["cooking"],
+    items: [
+      { id: "protein", name: "Protein shakes/powder" },
+    ],
+  },
+  cannabis: {
+    label: "Cannabis", alwaysShow: true,
+    items: [
+      { id: "cannabis", name: "Cannabis supplies" },
+    ],
+  },
+  car: {
+    label: "Car / Travel / Documents", alwaysShow: true,
+    items: [
+      { id: "carcharger", name: "Car charger" },
+      { id: "umbrella", name: "Umbrella" },
+      { id: "sunglasses", name: "Sunglasses" },
+      { id: "wallet", name: "Wallet / ID" },
+    ],
+  },
+  downtime: {
+    label: "Downtime", alwaysShow: true,
+    items: [
+      { id: "journal", name: "Journal/notebook" },
+      { id: "pen", name: "Pen" },
+      { id: "kindle", name: "Kindle or books" },
+    ],
+  },
+};
+
+const TRIP_TYPES = [
+  { value: "working", label: "Working remotely", icon: "\uD83D\uDCBB" },
+  { value: "beach", label: "Beach / water", icon: "\uD83C\uDFD6" },
+  { value: "exploring", label: "Exploring / eating out", icon: "\uD83C\uDF7D" },
+  { value: "cooking", label: "Cooking at the rental", icon: "\uD83C\uDF73" },
+  { value: "workout", label: "Workout / exercise", icon: "\uD83C\uDFCB\uFE0F" },
+];
+
+function daysBetween(d1, d2) {
+  return Math.round((new Date(d2) - new Date(d1)) / (1000*60*60*24));
+}
+
+function shouldShowItem(item, tempHigh, tempLow, tripTypes) {
+  if (item.minHigh !== undefined || item.maxHigh !== undefined || item.orLowBelow !== undefined) {
+    let show = false;
+    if (item.minHigh !== undefined && tempHigh >= item.minHigh) show = true;
+    if (item.maxHigh !== undefined && tempHigh <= item.maxHigh) show = true;
+    if (item.orLowBelow !== undefined && tempLow <= item.orLowBelow) show = true;
+    if (item.minHigh !== undefined && item.maxHigh === undefined && item.orLowBelow === undefined) {
+      show = tempHigh >= item.minHigh;
+    }
+    if (item.showWhen) {
+      return show || item.showWhen.some(t => tripTypes.includes(t));
+    }
+    if (!show) return false;
+  }
+  if (item.showWhen) {
+    return item.showWhen.some(t => tripTypes.includes(t));
+  }
+  return true;
+}
+
+function shouldShowSection(section, tripTypes) {
+  if (section.alwaysShow) return true;
+  if (section.showWhen) return section.showWhen.some(t => tripTypes.includes(t));
+  return true;
+}
+
+function CheckItem({ item, checked, onToggle, dayOutfits, indent }) {
+  const showCount = item.hasCount && dayOutfits > 0;
+  return (
+    <label style={{
+      display: "flex", alignItems: "flex-start", gap: 10, padding: "7px 0",
+      paddingLeft: indent ? 28 : 0, cursor: "pointer", fontSize: 15, lineHeight: 1.4,
+      color: checked ? "#8a9a7a" : "#3d3a35",
+      textDecoration: checked ? "line-through" : "none", transition: "all 0.2s ease",
+    }}>
+      <input type="checkbox" checked={checked} onChange={onToggle} style={{
+        width: 20, height: 20, marginTop: 1, accentColor: "#6b7f5c", cursor: "pointer", flexShrink: 0,
+      }} />
+      <span>
+        {item.name}
+        {showCount && <span style={{ color: "#a09080", fontStyle: "italic" }}> ({dayOutfits})</span>}
+        {item.conditional && <span style={{ color: "#b8a898", fontSize: 13, fontStyle: "italic" }}> — {item.conditional}</span>}
+      </span>
+    </label>
+  );
+}
+
+function Section({ sectionKey, section, tempHigh, tempLow, tripTypes, checked, onToggle, dayOutfits, customItems, onAddCustom, onRemoveCustom }) {
+  const visibleItems = section.items.filter(item => shouldShowItem(item, tempHigh, tempLow, tripTypes));
+  if (visibleItems.length === 0 && (!customItems || customItems.length === 0)) return null;
+
+  const allIds = [];
+  visibleItems.forEach(item => {
+    allIds.push(item.id);
+    if (item.contents) item.contents.forEach(c => allIds.push(c.id));
+  });
+  if (customItems) customItems.forEach(c => allIds.push(c.id));
+  const totalCount = allIds.length;
+  const checkedCount = allIds.filter(id => checked[id]).length;
+
+  const [addingCustom, setAddingCustom] = useState(false);
+  const [customText, setCustomText] = useState("");
+
+  const handleAddCustom = () => {
+    if (customText.trim()) {
+      onAddCustom(sectionKey, customText.trim());
+      setCustomText("");
+      setAddingCustom(false);
+    }
+  };
+
+  return (
+    <div style={{
+      marginBottom: 24, background: "rgba(255,255,255,0.7)", borderRadius: 12,
+      padding: "16px 20px", border: "1px solid #e8e0d6",
+    }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        marginBottom: 8, borderBottom: "2px solid #d4ccc2", paddingBottom: 8,
+      }}>
+        <h3 style={{
+          margin: 0, fontSize: 16, fontWeight: 700, color: "#4a4540",
+          letterSpacing: "0.02em", fontFamily: "'DM Sans', sans-serif",
+        }}>{section.label}</h3>
+        <span style={{
+          fontSize: 13, color: checkedCount === totalCount ? "#6b7f5c" : "#a09888", fontWeight: 600,
+        }}>{checkedCount}/{totalCount}</span>
+      </div>
+
+      {visibleItems.map(item => (
+        <div key={item.id}>
+          <CheckItem item={item} checked={!!checked[item.id]} onToggle={() => onToggle(item.id)} dayOutfits={dayOutfits} />
+          {item.isBag && item.contents && (
+            <div style={{ borderLeft: "2px solid #e0d8ce", marginLeft: 10, marginBottom: 4 }}>
+              {item.contents.map(sub => (
+                <CheckItem key={sub.id} item={sub} checked={!!checked[sub.id]} onToggle={() => onToggle(sub.id)} dayOutfits={dayOutfits} indent={true} />
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {customItems && customItems.map(ci => (
+        <div key={ci.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ flex: 1 }}>
+            <CheckItem item={ci} checked={!!checked[ci.id]} onToggle={() => onToggle(ci.id)} dayOutfits={dayOutfits} />
+          </div>
+          <button onClick={() => onRemoveCustom(sectionKey, ci.id)} style={{
+            background: "none", border: "none", color: "#c0a898", cursor: "pointer",
+            fontSize: 16, padding: "4px 6px", borderRadius: 4, lineHeight: 1,
+          }} title="Remove">&times;</button>
+        </div>
+      ))}
+
+      {addingCustom ? (
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <input type="text" value={customText} onChange={e => setCustomText(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleAddCustom()}
+            placeholder="Item name..." autoFocus
+            style={{
+              flex: 1, padding: "6px 10px", border: "1px solid #d4ccc2", borderRadius: 6,
+              fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none",
+            }}
+          />
+          <button onClick={handleAddCustom} style={{
+            padding: "6px 14px", background: "#6b7f5c", color: "#fff", border: "none",
+            borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600,
+          }}>Add</button>
+          <button onClick={() => { setAddingCustom(false); setCustomText(""); }} style={{
+            padding: "6px 10px", background: "none", color: "#a09888", border: "1px solid #d4ccc2",
+            borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+          }}>Cancel</button>
+        </div>
+      ) : (
+        <button onClick={() => setAddingCustom(true)} style={{
+          marginTop: 6, background: "none", border: "none", color: "#a09888",
+          cursor: "pointer", fontSize: 13, padding: "4px 0", fontFamily: "'DM Sans', sans-serif",
+        }}>+ Add item</button>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [view, setView] = useState("setup");
+  const [destination, setDestination] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [tempHigh, setTempHigh] = useState("");
+  const [tempLow, setTempLow] = useState("");
+  const [tripTypes, setTripTypes] = useState([]);
+  const [checked, setChecked] = useState({});
+  const [customItems, setCustomItems] = useState({});
+  const [trips, setTrips] = useState(() => loadTrips());
+  const [currentTripId, setCurrentTripId] = useState(null);
+  const [saveConfirm, setSaveConfirm] = useState(false);
+
+  const nights = (startDate && endDate) ? daysBetween(startDate, endDate) : 0;
+  const dayOutfits = Math.max(0, nights - 1);
+
+  const toggleTripType = (val) => {
+    setTripTypes(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
+  };
+  const toggleChecked = (id) => {
+    setChecked(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+  const addCustomItem = (sectionKey, name) => {
+    const id = "custom_" + sectionKey + "_" + Date.now();
+    setCustomItems(prev => ({ ...prev, [sectionKey]: [...(prev[sectionKey] || []), { id, name }] }));
+  };
+  const removeCustomItem = (sectionKey, itemId) => {
+    setCustomItems(prev => ({ ...prev, [sectionKey]: (prev[sectionKey] || []).filter(i => i.id !== itemId) }));
+    setChecked(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+  };
+
+  const canGenerate = destination && startDate && endDate && tempHigh !== "" && tempLow !== "" && tripTypes.length > 0 && nights > 0;
+
+  const generateList = () => {
+    setCurrentTripId(Date.now().toString());
+    setChecked({});
+    setCustomItems({});
+    setView("checklist");
+  };
+
+  const saveTrip = () => {
+    const trip = {
+      id: currentTripId, destination, startDate, endDate, nights,
+      tempHigh: Number(tempHigh), tempLow: Number(tempLow),
+      tripTypes, checked, customItems, savedAt: new Date().toISOString(),
+    };
+    const updated = [trip, ...trips.filter(t => t.id !== currentTripId)];
+    setTrips(updated);
+    saveTripsToStorage(updated);
+    setSaveConfirm(true);
+    setTimeout(() => setSaveConfirm(false), 2000);
+  };
+
+  const loadTrip = (trip) => {
+    setDestination(trip.destination);
+    setStartDate(trip.startDate);
+    setEndDate(trip.endDate);
+    setTempHigh(trip.tempHigh !== undefined ? trip.tempHigh : "");
+    setTempLow(trip.tempLow !== undefined ? trip.tempLow : "");
+    setTripTypes(trip.tripTypes);
+    setChecked(trip.checked || {});
+    setCustomItems(trip.customItems || {});
+    setCurrentTripId(trip.id);
+    setView("checklist");
+  };
+
+  const deleteTrip = (tripId) => {
+    const updated = trips.filter(t => t.id !== tripId);
+    setTrips(updated);
+    saveTripsToStorage(updated);
+  };
+
+  const startOver = () => {
+    setView("setup"); setDestination(""); setStartDate(""); setEndDate("");
+    setTempHigh(""); setTempLow(""); setTripTypes([]); setChecked({});
+    setCustomItems({}); setCurrentTripId(null);
+  };
+
+  const getTotalProgress = () => {
+    let total = 0, done = 0;
+    Object.entries(MASTER_ITEMS).forEach(([key, section]) => {
+      if (!shouldShowSection(section, tripTypes)) return;
+      section.items.forEach(item => {
+        if (!shouldShowItem(item, Number(tempHigh), Number(tempLow), tripTypes)) return;
+        total++; if (checked[item.id]) done++;
+        if (item.contents) item.contents.forEach(sub => { total++; if (checked[sub.id]) done++; });
+      });
+      (customItems[key] || []).forEach(ci => { total++; if (checked[ci.id]) done++; });
+    });
+    return { total, done };
+  };
+
+  const inputStyle = {
+    width: "100%", padding: "10px 14px", border: "1px solid #d4ccc2", borderRadius: 8,
+    fontSize: 15, fontFamily: "'DM Sans', sans-serif", background: "#fff", outline: "none", boxSizing: "border-box",
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", minHeight: "100dvh" }}>
+      {/* Header */}
+      <div style={{ padding: "24px 20px 16px", textAlign: "center", borderBottom: "1px solid #ddd5c9", position: "sticky", top: 0, background: "linear-gradient(170deg, #f5f0ea 0%, #ebe4da 100%)", zIndex: 10 }}>
+        <h1 style={{ margin: 0, fontSize: 28, fontFamily: "'Playfair Display', serif", fontWeight: 700, color: "#4a4540" }}>Pack Smart</h1>
+        <p style={{ margin: "4px 0 0", fontSize: 13, color: "#9a9080", letterSpacing: "0.05em", textTransform: "uppercase" }}>Personalized packing list</p>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14 }}>
+          {[
+            { key: "setup", label: "New Trip", action: startOver },
+            { key: "checklist", label: "Checklist", disabled: !currentTripId },
+            { key: "history", label: "Past Trips" },
+          ].map(tab => (
+            <button key={tab.key}
+              onClick={() => tab.action ? tab.action() : setView(tab.key)}
+              disabled={tab.disabled}
+              style={{
+                padding: "6px 16px", borderRadius: 20,
+                border: view === tab.key ? "2px solid #6b7f5c" : "1px solid #d4ccc2",
+                background: view === tab.key ? "#6b7f5c" : "transparent",
+                color: view === tab.key ? "#fff" : tab.disabled ? "#ccc4b8" : "#6a6560",
+                fontSize: 13, fontWeight: 600, cursor: tab.disabled ? "default" : "pointer",
+                fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s ease",
+              }}
+            >{tab.label}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 520, margin: "0 auto", padding: "20px 16px 40px" }}>
+
+        {/* SETUP */}
+        {view === "setup" && (
+          <div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#6a6560", display: "block", marginBottom: 6 }}>Destination</label>
+              <input type="text" value={destination} onChange={e => setDestination(e.target.value)} placeholder="e.g. Manteo, NC" style={inputStyle} />
+            </div>
+
+            <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#6a6560", display: "block", marginBottom: 6 }}>Depart</label>
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#6a6560", display: "block", marginBottom: 6 }}>Return</label>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
+              </div>
+            </div>
+
+            {nights > 0 && (
+              <div style={{ background: "rgba(107,127,92,0.1)", borderRadius: 8, padding: "10px 14px", marginBottom: 20, fontSize: 14, color: "#4a4540" }}>
+                <strong>{nights} nights</strong> → <strong>{dayOutfits} day outfits</strong> needed (travel days = same outfit)
+              </div>
+            )}
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#6a6560", display: "block", marginBottom: 8 }}>Expected temperatures (°F)</label>
+              <div style={{ display: "flex", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: "#9a9080", display: "block", marginBottom: 4 }}>Daytime high</label>
+                  <input type="number" value={tempHigh} onChange={e => setTempHigh(e.target.value)} placeholder="e.g. 72" style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: "#9a9080", display: "block", marginBottom: 4 }}>Nighttime low</label>
+                  <input type="number" value={tempLow} onChange={e => setTempLow(e.target.value)} placeholder="e.g. 55" style={inputStyle} />
+                </div>
+              </div>
+              {tempHigh !== "" && tempLow !== "" && (
+                <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(107,127,92,0.08)", borderRadius: 6, fontSize: 13, color: "#6a6560" }}>
+                  {Number(tempHigh) >= 80 ? "\u2600\uFE0F Hot — shorts, sandals, swimsuit" :
+                   Number(tempHigh) >= 70 ? "\uD83C\uDF24 Warm — shorts optional, light layers" :
+                   Number(tempHigh) >= 60 ? "\uD83C\uDF25 Mild — leggings, fleece, windbreaker" :
+                   Number(tempHigh) >= 50 ? "\uD83E\uDDE5 Cool — heavier layers, Nano Puff" :
+                   "\uD83E\uDD76 Cold — full winter gear"}
+                  {Number(tempLow) <= 40 && Number(tempHigh) > 50 && " · Cold nights — packing warmer options too"}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#6a6560", display: "block", marginBottom: 8 }}>What are you doing on this trip?</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {TRIP_TYPES.map(t => (
+                  <button key={t.value} onClick={() => toggleTripType(t.value)} style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8,
+                    border: tripTypes.includes(t.value) ? "2px solid #6b7f5c" : "1px solid #d4ccc2",
+                    background: tripTypes.includes(t.value) ? "rgba(107,127,92,0.12)" : "#fff",
+                    cursor: "pointer", fontSize: 14, fontFamily: "'DM Sans', sans-serif", color: "#4a4540",
+                    fontWeight: tripTypes.includes(t.value) ? 600 : 400, textAlign: "left", transition: "all 0.15s ease",
+                  }}>
+                    <span style={{ fontSize: 18 }}>{t.icon}</span>{t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={generateList} disabled={!canGenerate} style={{
+              width: "100%", padding: "14px", borderRadius: 10, border: "none",
+              background: canGenerate ? "#6b7f5c" : "#d4ccc2",
+              color: canGenerate ? "#fff" : "#a09888",
+              fontSize: 16, fontWeight: 700, cursor: canGenerate ? "pointer" : "default",
+              fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s ease",
+            }}>Generate My Packing List</button>
+          </div>
+        )}
+
+        {/* CHECKLIST */}
+        {view === "checklist" && (
+          <div>
+            <div style={{ background: "rgba(107,127,92,0.1)", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#4a4540" }}>{destination}</div>
+              <div style={{ fontSize: 13, color: "#7a7570", marginTop: 4 }}>
+                {new Date(startDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} → {new Date(endDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · {nights} nights · {dayOutfits} day outfits
+              </div>
+              <div style={{ fontSize: 12, color: "#9a9080", marginTop: 2 }}>High {tempHigh}°F · Low {tempLow}°F</div>
+              {(() => {
+                const { total, done } = getTotalProgress();
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                return (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#7a7570", marginBottom: 4 }}>
+                      <span>{done} of {total} packed</span><span>{pct}%</span>
+                    </div>
+                    <div style={{ height: 6, background: "#ddd5c9", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: pct + "%", background: pct === 100 ? "#6b7f5c" : "#8a9a7a", borderRadius: 3, transition: "width 0.3s ease" }} />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {Object.entries(MASTER_ITEMS).map(([key, section]) => {
+              if (!shouldShowSection(section, tripTypes)) return null;
+              return (
+                <Section key={key} sectionKey={key} section={section}
+                  tempHigh={Number(tempHigh)} tempLow={Number(tempLow)}
+                  tripTypes={tripTypes} checked={checked} onToggle={toggleChecked}
+                  dayOutfits={dayOutfits} customItems={customItems[key] || []}
+                  onAddCustom={addCustomItem} onRemoveCustom={removeCustomItem}
+                />
+              );
+            })}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={saveTrip} style={{
+                flex: 1, padding: "12px", borderRadius: 10, border: "none",
+                background: saveConfirm ? "#4a6340" : "#6b7f5c", color: "#fff",
+                fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                transition: "all 0.2s ease",
+              }}>{saveConfirm ? "Saved!" : "Save Trip"}</button>
+              <button onClick={startOver} style={{
+                flex: 1, padding: "12px", borderRadius: 10, border: "1px solid #d4ccc2",
+                background: "transparent", color: "#6a6560", fontSize: 14, fontWeight: 600,
+                cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+              }}>New Trip</button>
+            </div>
+          </div>
+        )}
+
+        {/* HISTORY */}
+        {view === "history" && (
+          <div>
+            {trips.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: "#a09888", fontSize: 15 }}>
+                No saved trips yet. Create one to get started.
+              </div>
+            ) : (
+              trips.map(trip => (
+                <div key={trip.id} style={{
+                  background: "rgba(255,255,255,0.7)", borderRadius: 12,
+                  padding: "16px 18px", marginBottom: 12, border: "1px solid #e8e0d6",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#4a4540" }}>{trip.destination}</div>
+                      <div style={{ fontSize: 13, color: "#7a7570", marginTop: 2 }}>
+                        {new Date(trip.startDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {new Date(trip.endDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {trip.nights} nights
+                      </div>
+                      <div style={{ fontSize: 12, color: "#a09888", marginTop: 4 }}>
+                        {trip.tripTypes.map(t => { const f = TRIP_TYPES.find(tt => tt.value === t); return f ? f.icon : ""; }).join(" ")}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => loadTrip(trip)} style={{
+                        padding: "6px 12px", borderRadius: 6, border: "1px solid #d4ccc2",
+                        background: "#fff", color: "#6a6560", fontSize: 12, fontWeight: 600,
+                        cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                      }}>Open</button>
+                      <button onClick={() => deleteTrip(trip.id)} style={{
+                        padding: "6px 10px", borderRadius: 6, border: "1px solid #e0d0c0",
+                        background: "#fff", color: "#c0a898", fontSize: 12,
+                        cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                      }}>&times;</button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
